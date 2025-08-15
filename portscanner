@@ -1,0 +1,59 @@
+import socket
+import threading
+from queue import Queue
+
+# Dictionary for common port -> service mapping
+common_services = {
+    20: "FTP Data",
+    21: "FTP Control",
+    22: "SSH",
+    23: "Telnet",
+    25: "SMTP",
+    53: "DNS",
+    80: "HTTP",
+    110: "POP3",
+    143: "IMAP",
+    443: "HTTPS",
+    3389: "RDP"
+}
+
+# Ask user for input
+target = input("Enter host to scan: ")
+start_port = int(input("Enter start port: "))
+end_port = int(input("Enter end port: "))
+
+# Thread-safe queue for ports
+port_queue = Queue()
+for port in range(start_port, end_port + 1):
+    port_queue.put(port)
+
+print(f"\nScanning {target} from port {start_port} to {end_port}...\n")
+
+# Thread worker function
+def scan_port():
+    while not port_queue.empty():
+        port = port_queue.get()
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(0.5)
+        try:
+            result = s.connect_ex((target, port))
+            if result == 0:
+                service = common_services.get(port, "Unknown Service")
+                print(f"Port {port} is OPEN  -->  {service}")
+        except socket.error:
+            pass
+        finally:
+            s.close()
+            port_queue.task_done()
+
+# Create threads
+threads = []
+for _ in range(50):  # Number of threads
+    t = threading.Thread(target=scan_port)
+    t.daemon = True
+    threads.append(t)
+    t.start()
+
+# Wait for all threads to finish
+port_queue.join()
+print("\nScan complete.")
